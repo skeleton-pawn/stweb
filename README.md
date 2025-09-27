@@ -5,6 +5,5 @@ study-timer-project/
 ├── templates/              # 👈 Flask 템플릿 폴더 (HTML 파일)
 │   ├── index.html
 │   └── multi.html
-├── .gitignore
-└── Procfile                # 👈 [추가 필요] 서버 실행 명령어를 정의 (Heroku/Render 등 사용)
+└──.gitignore
 ```
