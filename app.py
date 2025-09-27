@@ -10,8 +10,12 @@ CORS(app)
 
 # --- Database Setup ---
 # Render에서 제공하는 DATABASE_URL 환경 변수를 사용합니다.
-# 로컬 테스트를 위해 기본값으로 SQLite 경로를 설정할 수 있습니다.
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local_database.db')
+# SQLAlchemy가 'postgres://' 대신 'postgresql://'을 인식하므로 URL을 수정합니다.
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///local_database.db')
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
