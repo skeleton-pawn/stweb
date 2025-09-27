@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Timer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .today-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            /* margin-bottom: 20px; */ /* 동기부여 메시지가 없을 경우를 대비해 여백은 메시지 쪽에서 관리 */
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-item h3 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .stat-item p {
+            opacity: 0.9;
+        }
+
+        /* [추가] 동기부여 메시지 스타일 */
+        .motivation-message {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+            color: #333;
+            padding: 15px 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin: 20px 0; /* 위아래로 20px 여백 */
+            box-shadow: 0 4px 15px rgba(255, 154, 158, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            animation: motivationFadeIn 0.8s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .motivation-message::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            animation: motivationShine 2s ease-in-out infinite;
+        }
+
+        @keyframes motivationFadeIn {
+            0% {
+                transform: scale(0.9) translateY(-10px);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes motivationShine {
+            0% {
+                left: -100%;
+            }
+            50% {
+                left: 100%;
+            }
+            100% {
+                left: 100%;
+            }
+        }
+
+        .timer-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .subject-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .subject-btn {
+            padding: 15px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+
+        .subject-btn:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .subject-btn.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .timer-display {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #667eea;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .subject-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .subject-item {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .subject-item h4 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .period-card {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .period-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .period-summary {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .subject-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .subject-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .subject-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .subject-time {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(110%); 
+            transition: transform 0.4s ease-in-out;
+            max-width: 300px;
+            word-wrap: break-word;
+            white-space: normal;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff3838 100%);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+            .timer-display {
+                font-size: 2.5em;
+            }
+            .control-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/stopwatches" style="
+        position: fixed; 
+        top: 20px; 
+        left: 20px; 
+        padding: 10px 15px; 
+        background-color: #ffc107; 
+        color: black; 
+        text-decoration: none; 
+        border-radius: 8px; 
+        font-weight: bold;
+        z-index: 1001;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transition: transform 0.2s ease;">
+        🚀 Stop Watches 바로가기
+    </a>
+    <style>
+        a[href="/stopwatches"]:hover {
+            transform: scale(1.05);
+        }
+    </style>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Study Timer</h1>
+            <p id="current-time"></p>
+        </div>
+
+        <!-- 오늘의 통계 -->
+        <div class="card">
+            <div class="today-stats">
+                <div class="stat-item">
+                    <h3 id="total-hours">0.00</h3>
+                    <p>총 공부시간 (시간)</p>
+                </div>
+                <div class="stat-item">
+                    <h3 id="study-date">오늘</h3>
+                    <p>공부 날짜 (3AM 기준)</p>
+                </div>
+            </div>
+            <!-- 동기부여 메시지가 여기에 삽입됩니다 -->
+            <div id="subject-stats" class="subject-list"></div>
+        </div>
+
+        <!-- 타이머 섹션 -->
+        <div class="card timer-section">
+            <h2>과목을 선택하세요</h2>
+            <div class="subject-selector" id="subject-selector"></div>
+            
+            <div class="timer-display" id="timer-display">00:00:00</div>
+            
+            <div class="control-buttons">
+                <button class="btn btn-start" id="start-btn" onclick="startTimer()">시작</button>
+                <button class="btn btn-stop" id="stop-btn" onclick="stopTimer()" disabled>정지</button>
+            </div>
+        </div>
+
+        <!-- 통계 탭 -->
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('monthly')">월간 통계</button>
+                <button class="tab" onclick="showTab('subjects')">과목별 통계</button>
+                <button class="tab" onclick="showTab('subject-chart')">과목별 차트</button>
+            </div>
+
+            <div id="monthly-content" class="tab-content active">
+                <div class="chart-container">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+
+            <div id="subjects-content" class="tab-content">
+                <h3 style="text-align: center; margin-bottom: 30px; color: #667eea;">📊 과목별 공부시간 비교</h3>
+                <div id="subject-comparison"></div>
+            </div>  
+            <div id="subject-chart-content" class="tab-content">
+                <div id="subject-charts-container">
+                </div>
+            </div>
+        </div>
+    <!-- 알림 -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // 전역 변수
+        let subjects = [];
+        let selectedSubject = null;
+        let timerInterval = null;
+        let startTime = null;
+        let isRunning = false;
+        let charts = {};
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSubjects();
+            loadTodayStats();
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            loadStatistics();
+            loadSubjectComparison();
+        });
+
+        // 현재 시간 업데이트
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('ko-KR');
+        }
+
+        // 과목 로드
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/api/subjects');
+                subjects = await response.json();
+                
+                const selector = document.getElementById('subject-selector');
+                selector.innerHTML = '';
+                
+                subjects.forEach(subject => {
+                    const btn = document.createElement('button');
+                    btn.className = 'subject-btn';
+                    btn.textContent = subject;
+                    btn.onclick = () => selectSubject(subject);
+                    selector.appendChild(btn);
+                });
+            } catch (error) {
+                showNotification('과목 로드 실패', 'error');
+            }
+        }
+
+        // 과목 선택
+        function selectSubject(subject) {
+            selectedSubject = subject;
+            document.querySelectorAll('.subject-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (btn.textContent === subject) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+
+        // [수정 1] 동기부여 메시지 표시를 위한 새로운 함수
+        function showMotivationMessage(message) {
+            // 기존 메시지가 있다면 먼저 제거
+            const existingMessage = document.getElementById('motivation-message');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+            
+            // 서버에서 받은 메시지가 없으면 함수 종료
+            if (!message) return;
+
+            // 새 메시지 요소 생성
+            const messageDiv = document.createElement('div');
+            messageDiv.id = 'motivation-message';
+            messageDiv.className = 'motivation-message';
+            messageDiv.textContent = message;
+            
+            // [수정 2] 메시지를 화면에 실제로 추가하는 누락된 코드
+            const parentCard = document.querySelector('.today-stats').parentElement;
+            const subjectStats = document.getElementById('subject-stats');
+            parentCard.insertBefore(messageDiv, subjectStats);
+        }
+        
+        // [수정 3] 중복되고 꼬인 구조를 바로잡은 `loadTodayStats` 함수
+        async function loadTodayStats() {
+            try {
+                const response = await fetch('/api/today-stats');
+                if (!response.ok) throw new Error('Failed to fetch stats');
+                
+                const data = await response.json();
+                
+                document.getElementById('total-hours').textContent = data.total_hours;
+                document.getElementById('study-date').textContent = data.date;
+                
+                // 동기부여 메시지 표시 함수 호출
+                showMotivationMessage(data.motivation_message);
+                
+                const subjectStats = document.getElementById('subject-stats');
+                subjectStats.innerHTML = '';
+                
+                Object.entries(data.subject_times).forEach(([subject, stats]) => {
+                    const div = document.createElement('div');
+                    div.className = 'subject-item';
+                    div.innerHTML = `
+                        <h4>${subject}</h4>
+                        <p>${stats.minutes.toFixed(1)}분 (${stats.hours.toFixed(2)}시간)</p>
+                    `;
+                    subjectStats.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Failed to load today stats:', error);
+                showNotification('통계 로드 실패', 'error');
+            }
+        }
+        
+        // [수정 4] 모든 함수들이 독립적으로 존재하도록 구조 수정
+        // 타이머 시작
+        function startTimer() {
+            if (!selectedSubject) {
+                showNotification('과목을 선택해주세요', 'error');
+                return;
+            }
+
+            startTime = Date.now();
+            isRunning = true;
+            
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('stop-btn').disabled = false;
+            
+            timerInterval = setInterval(updateTimerDisplay, 1000);
+            showNotification(`${selectedSubject} 공부 시작!`, 'success');
+        }
+
+        // 타이머 정지 및 기록
+        async function stopTimer() {
+            if (!isRunning) return;
+            
+            const endTime = Date.now();
+            const duration = (endTime - startTime) / 1000;
+            
+            clearInterval(timerInterval);
+            isRunning = false;
+            
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('stop-btn').disabled = true;
+            document.getElementById('timer-display').textContent = '00:00:00';
+            
+            // 서버에 기록
+            try {
+                const response = await fetch('/api/record-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject: selectedSubject,
+                        start_time: startTime / 1000,
+                        end_time: endTime / 1000,
+                        duration: duration
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification(`${result.duration_minutes}분 기록 완료!`, 'success');
+                    loadTodayStats(); // 이 함수가 동기부여 메시지를 포함한 모든 통계를 새로고침합니다.
+                    loadStatistics();
+                    loadSubjectComparison();
+                } else {
+                    if (result.manual_update_info) {
+                        const info = result.manual_update_info;
+                        const alertMessage = `[기록 실패 - 수동 업데이트 필요]\n\n아래 내용을 복사하여 Google Sheets에 직접 입력해주세요.\n\n----------------------------------------\nDate: ${info.date}\nSubject: ${info.subject}\nStart Time: ${info.start_time_str}\nEnd Time: ${info.end_time_str}\nDuration: ${info.duration_seconds}\n----------------------------------------\n\nError: ${result.details}`;
+                        alert(alertMessage);
+                    } else {
+                        showNotification(result.message || '기록 실패', 'error');
+                    }
+                }
+            } catch (error) {
+                showNotification('서버 통신 오류. 네트워크를 확인해주세요.', 'error');
+            }
+        }
+
+        // 타이머 표시 업데이트
+        function updateTimerDisplay() {
+            if (!isRunning) return;
+            
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            
+            const display = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timer-display').textContent = display;
+        }
+
+        // 탭 전환
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tabName}-content`).classList.add('active');
+            
+            if (tabName === 'subjects') {
+                loadSubjectComparison();
+            } else if (tabName === 'subject-chart') {
+                loadAndCreateSubjectChart();
+            }
+        }
+
+        // 통계 로드
+        async function loadStatistics() {
+            const periods = [
+                { name: 'monthly', days: 30, chartId: 'monthlyChart' }
+            ];
+
+            for (const period of periods) {
+                try {
+                    const response = await fetch(`/api/statistics/${period.days}`);
+                    const data = await response.json();
+                    createChart(period.chartId, data);
+                } catch (error) {
+                    console.error(`Failed to load ${period.name} statistics:`, error);
+                }
+            }
+        }
+
+        // 차트 생성
+        function createChart(chartId, data) {
+            const ctx = document.getElementById(chartId).getContext('2d');
+            
+            if (charts[chartId]) {
+                charts[chartId].destroy();
+            }
+            
+            charts[chartId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(data.daily_stats),
+                    datasets: [{
+                        label: '공부시간 (시간)',
+                        data: Object.values(data.daily_stats),
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 8,
+                            title: { display: true, text: '시간' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 과목별 비교 통계 로드
+        async function loadSubjectComparison() {
+            try {
+                const response = await fetch('/api/subject-comparison');
+                const data = await response.json();
+                
+                const container = document.getElementById('subject-comparison');
+                container.innerHTML = '';
+                container.className = 'comparison-grid';
+                
+                const periods = [
+                    { key: '3days', title: '최근 3일' },
+                    { key: '7days', title: '최근 7일' },
+                    { key: '14days', title: '최근 14일' },
+                    { key: '30days', title: '최근 30일' }
+                ];
+                
+                periods.forEach(period => {
+                    const periodData = data[period.key];
+                    if (!periodData) return;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'period-card';
+                    
+                    let subjectRows = Object.entries(periodData.subjects)
+                        .filter(([_, stats]) => stats.hours > 0)
+                        .map(([subject, stats]) => `
+                            <div class="subject-row">
+                                <span class="subject-name">${subject}</span>
+                                <span class="subject-time">${stats.hours}시간</span>
+                            </div>
+                        `).join('');
+                    
+                    card.innerHTML = `
+                        <div class="period-title">${period.title}</div>
+                        <div class="period-summary">
+                            총 ${periodData.total_hours}시간<br>
+                            평균 ${periodData.average_per_day}시간/일
+                        </div>
+                        <div class="subject-breakdown">
+                            ${subjectRows || '<div style="text-align: center; color: #999;">공부 기록이 없습니다</div>'}
+                        </div>
+                    `;
+                    
+                    container.appendChild(card);
+                });
+                
+            } catch (error) {
+                console.error('Failed to load subject comparison:', error);
+                showNotification('과목별 통계 로드 실패', 'error');
+            }
+        }
+
+        // 과목별 차트 데이터 로드 및 생성
+        async function loadAndCreateSubjectChart() {
+            try {
+                const response = await fetch('/api/subject-comparison');
+                const data = await response.json();
+                createSubjectComparisonChart(data);
+            } catch (error) {
+                console.error('Failed to load subject comparison for charts:', error);
+                showNotification('과목별 차트 데이터 로드 실패', 'error');
+                document.getElementById('subject-charts-container').innerHTML = '<p style="text-align:center; color:#999;">차트를 불러오는 중 오류가 발생했습니다.</p>';
+            }
+        }
+
+        // 일시적 알림 표시
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            
+            notification.className = 'notification';
+            notification.classList.add(type, 'show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // 과목별 비교 차트 생성
+        function createSubjectComparisonChart(data) {
+            const container = document.getElementById('subject-charts-container');
+            
+            Object.keys(charts).forEach(chartId => {
+                if (chartId.startsWith('subjectChart-') && charts[chartId]) {
+                    charts[chartId].destroy();
+                    delete charts[chartId];
+                }
+            });
+            container.innerHTML = '';
+            
+            const periods = [
+                { key: '3days', title: '최근 3일' },
+                { key: '7days', title: '최근 7일' },
+                { key: '14days', title: '최근 14일' },
+                { key: '30days', title: '최근 30일' }
+            ];
+
+            const globalColors = [
+                'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)', 'rgba(255, 205, 86, 0.8)',
+                'rgba(199, 199, 199, 0.8)', 'rgba(231, 76, 60, 0.8)'
+            ];
+
+            periods.forEach(period => {
+                const periodData = data[period.key];
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = 'chart-wrapper';
+                chartWrapper.style.marginBottom = '50px';
+
+                const title = document.createElement('h3');
+                title.textContent = `📊 ${period.title} 과목별 공부 시간`;
+                title.style.textAlign = 'center';
+                title.style.color = '#667eea';
+                chartWrapper.appendChild(title);
+
+                if (!periodData || periodData.total_hours === 0) {
+                    const noDataMessage = document.createElement('p');
+                    noDataMessage.textContent = '이 기간의 공부 기록이 없습니다.';
+                    noDataMessage.style.textAlign = 'center';
+                    noDataMessage.style.padding = '20px';
+                    noDataMessage.style.color = '#999';
+                    chartWrapper.appendChild(noDataMessage);
+                    container.appendChild(chartWrapper);
+                    return;
+                }
+
+                const filteredSubjects = Object.entries(periodData.subjects)
+                    .filter(([_, stats]) => stats.hours > 0)
+                    .sort((a, b) => b[1].hours - a[1].hours);
+
+                const labels = filteredSubjects.map(entry => entry[0]);
+                const values = filteredSubjects.map(entry => entry[1].hours);
+                
+                const dynamicHeight = (labels.length * 40) + 80;
+
+                const canvas = document.createElement('canvas');
+                const chartId = `subjectChart-${period.key}`;
+                canvas.id = chartId;
+                
+                const chartContainer = document.createElement('div');
+                chartContainer.style.height = `${dynamicHeight}px`; 
+                chartContainer.appendChild(canvas);
+                chartWrapper.appendChild(chartContainer);
+                container.appendChild(chartWrapper);
+                
+                const backgroundColors = labels.map(subject => {
+                    const subjectIndex = subjects.indexOf(subject);
+                    return globalColors[subjectIndex % globalColors.length];
+                });
+
+                charts[chartId] = new Chart(canvas.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '공부 시간 (시간)',
+                            data: values,
+                            backgroundColor: backgroundColors,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { beginAtZero: true, title: { display: true, text: '시간' } },
+                            y: { ticks: { autoSkip: false } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

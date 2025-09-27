@@ -1,0 +1,7 @@
+# Python 관련 파일
+__pycache__/
+*.pyc
+
+# 운영체제/에디터 파일
+.DS_Store
+.vscode/

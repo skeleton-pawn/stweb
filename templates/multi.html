@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stop Watches</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1c1e21;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        #reset-all-btn {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #ff6b6b 0%, #d32f2f 100%);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        #reset-all-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
+        }
+
+        #stopwatch-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 12px; /* 변경: 15px -> 12px */
+        }
+
+        .stopwatch-card {
+            background-color: white;
+            border: 1px solid #ddd; /* 변경: 2px -> 1px */
+            border-radius: 8px; /* 변경: 12px -> 8px */
+            padding: 10px; /* 변경: 15px -> 10px */
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .stopwatch-card.running {
+            border-color: #2e86de;
+            box-shadow: 0 4px 12px rgba(46, 134, 222, 0.3);
+        }
+
+        .stopwatch-number {
+            font-size: 1em; /* 변경: 1.2em -> 1em */
+            font-weight: bold;
+            color: #555;
+            background-color: #e9ecef;
+            width: 24px; /* 변경: 30px -> 24px */
+            height: 24px; /* 변경: 30px -> 24px */
+            line-height: 24px; /* 변경: 30px -> 24px */
+            border-radius: 50%;
+            margin: 0 auto 8px auto; /* 변경: 10px -> 8px */
+        }
+
+        .time-display {
+            font-size: 1.3em; /* 변경: 1.6em -> 1.3em */
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            color: #1c1e21;
+            margin-bottom: 12px; /* 변경: 15px -> 12px */
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 6px; /* 변경: 8px -> 6px */
+        }
+
+        .btn {
+            padding: 6px 10px; /* 변경: 8px 12px -> 6px 10px */
+            font-size: 0.8em; /* 변경: 0.9em -> 0.8em */
+            border: none;
+            border-radius: 5px; /* 변경: 6px -> 5px */
+            cursor: pointer;
+            transition: background-color 0.2s;
+            flex-grow: 1;
+        }
+
+        .toggle-btn {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .toggle-btn.stop {
+            background-color: #dc3545;
+        }
+
+        .reset-btn {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        /* 반응형 웹 설정은 그대로 유지하여 화면이 작아져도 잘 보이게 합니다. */
+        @media (max-width: 1400px) {
+            #stopwatch-grid { grid-template-columns: repeat(8, 1fr); }
+        }
+        @media (max-width: 1200px) {
+            #stopwatch-grid { grid-template-columns: repeat(6, 1fr); }
+        }
+        @media (max-width: 992px) {
+            #stopwatch-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+        @media (max-width: 768px) {
+            #stopwatch-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 576px) {
+            #stopwatch-grid { grid-template-columns: repeat(3, 1fr); }
+            .time-display { font-size: 1.1em; } /* 변경: 1.2em -> 1.1em */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Stop Watches</h1>
+        <div class="controls">
+            <button id="reset-all-btn">Reset All</button>
+        </div>
+        <div id="stopwatch-grid">
+            <!-- 40개의 스톱워치가 여기에 동적으로 생성됩니다. -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const grid = document.getElementById('stopwatch-grid');
+            const resetAllBtn = document.getElementById('reset-all-btn');
+            const NUM_STOPWATCHES = 40;
+            let stopwatches = [];
+
+            // 1. 상태 관리 및 초기화 함수
+            function init() {
+                for (let i = 1; i <= NUM_STOPWATCHES; i++) {
+                    // 각 스톱워치의 상태를 저장할 객체
+                    stopwatches.push({
+                        id: i,
+                        isRunning: false,
+                        startTime: 0,
+                        elapsedTime: 0,
+                        intervalId: null
+                    });
+
+                    // 화면에 표시될 HTML 카드 생성
+                    const card = document.createElement('div');
+                    card.className = 'stopwatch-card';
+                    card.dataset.id = i; // 카드에 ID 부여
+                    card.innerHTML = `
+                        <div class="stopwatch-number">${i}</div>
+                        <div class="time-display">00:00.00</div>
+                        <div class="btn-group">
+                            <button class="btn toggle-btn">Start</button>
+                            <button class="btn reset-btn">Reset</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                }
+            }
+
+            // 2. 이벤트 처리 (이벤트 위임 사용)
+            grid.addEventListener('click', (e) => {
+                const card = e.target.closest('.stopwatch-card');
+                if (!card) return;
+
+                const id = parseInt(card.dataset.id, 10);
+
+                if (e.target.classList.contains('toggle-btn')) {
+                    toggleTimer(id);
+                } else if (e.target.classList.contains('reset-btn')) {
+                    resetTimer(id);
+                }
+            });
+
+            resetAllBtn.addEventListener('click', () => {
+                for (let i = 1; i <= NUM_STOPWATCHES; i++) {
+                    resetTimer(i);
+                }
+            });
+
+            // 3. 핵심 기능 함수들
+            function toggleTimer(id) {
+                const state = stopwatches[id - 1];
+                const card = grid.querySelector(`[data-id='${id}']`);
+                const toggleBtn = card.querySelector('.toggle-btn');
+
+                if (state.isRunning) {
+                    // 타이머 정지
+                    clearInterval(state.intervalId);
+                    state.elapsedTime += Date.now() - state.startTime;
+                    state.isRunning = false;
+                    toggleBtn.textContent = 'Start';
+                    toggleBtn.classList.remove('stop');
+                    card.classList.remove('running');
+                } else {
+                    // 타이머 시작
+                    state.startTime = Date.now();
+                    state.isRunning = true;
+                    state.intervalId = setInterval(() => updateDisplay(id), 10);
+                    toggleBtn.textContent = 'Stop';
+                    toggleBtn.classList.add('stop');
+                    card.classList.add('running');
+                }
+            }
+
+            function resetTimer(id) {
+                const state = stopwatches[id - 1];
+                
+                if (state.isRunning) {
+                    clearInterval(state.intervalId);
+                }
+
+                // 상태 초기화
+                state.isRunning = false;
+                state.elapsedTime = 0;
+                state.intervalId = null;
+
+                // 화면 초기화
+                const card = grid.querySelector(`[data-id='${id}']`);
+                card.querySelector('.time-display').textContent = '00:00.00';
+                const toggleBtn = card.querySelector('.toggle-btn');
+                toggleBtn.textContent = 'Start';
+                toggleBtn.classList.remove('stop');
+                card.classList.remove('running');
+            }
+
+            function updateDisplay(id) {
+                const state = stopwatches[id - 1];
+                const card = grid.querySelector(`[data-id='${id}']`);
+                const timeDisplay = card.querySelector('.time-display');
+
+                const totalElapsed = state.elapsedTime + (Date.now() - state.startTime);
+                
+                const minutes = Math.floor(totalElapsed / 60000);
+                const seconds = Math.floor((totalElapsed % 60000) / 1000);
+                const hundredths = Math.floor((totalElapsed % 1000) / 10);
+
+                timeDisplay.textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`;
+            }
+
+            // 애플리케이션 시작
+            init();
+        });
+    </script>
+
+</body>
+</html>
