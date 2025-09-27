@@ -1,3 +1,6 @@
 Flask
 Flask-Cors
 gunicorn
+SQLAlchemy
+psycopg2-binary
+Flask-SQLAlchemy

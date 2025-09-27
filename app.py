@@ -1,47 +1,35 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
 from datetime import datetime, timedelta
 import os
-import sqlite3
 
 app = Flask(__name__)
 CORS(app)
 
 # --- Database Setup ---
-# Render의 영구 디스크 경로를 확인하고, 그렇지 않으면 로컬 파일을 사용합니다.
-if os.environ.get('RENDER'):
-    # Render 환경에서는 지정된 마운트 경로를 사용합니다.
-    db_dir = '/var/data'
-    if not os.path.exists(db_dir):
-        os.makedirs(db_dir)
-    DATABASE_PATH = os.path.join(db_dir, 'database.db')
-else:
-    # 로컬 환경에서는 프로젝트 루트에 데이터베이스 파일을 생성합니다.
-    DATABASE_PATH = 'database.db'
+# Render에서 제공하는 DATABASE_URL 환경 변수를 사용합니다.
+# 로컬 테스트를 위해 기본값으로 SQLite 경로를 설정할 수 있습니다.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local_database.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
 
 SUBJECTS = ["원가", "세법", "재정", "행정", "세회", "재무", "독서", "craft"]
 
-def get_db_connection():
-    """데이터베이스 연결을 생성하고 반환합니다."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row  # 결과를 딕셔너리처럼 사용할 수 있게 합니다.
-    return conn
+# --- Database Model ---
+class StudySession(db.Model):
+    __tablename__ = 'study_sessions'
+    id = db.Column(db.Integer, primary_key=True)
+    Date = db.Column(db.String, nullable=False)
+    Subject = db.Column(db.String, nullable=False)
+    StartTime = db.Column(db.String, nullable=False)
+    EndTime = db.Column(db.String, nullable=False)
+    Duration = db.Column(db.Integer, nullable=False)
 
-def init_db():
-    """데이터베이스 테이블을 초기화합니다."""
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS study_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                Date TEXT NOT NULL,
-                Subject TEXT NOT NULL,
-                StartTime TEXT NOT NULL,
-                EndTime TEXT NOT NULL,
-                Duration INTEGER NOT NULL
-            )
-        ''')
-        conn.commit()
+    def __repr__(self):
+        return f'<StudySession {self.Subject} on {self.Date}>'
 
 # --- Helper Functions ---
 def get_custom_date():
@@ -65,14 +53,15 @@ def get_motivation_message(today_hours, yesterday_hours):
     
     if today_hours > yesterday_hours:
         improvement = today_hours - yesterday_hours
-        return f"어제의 나를 넘어서고 있습니��! (+{improvement:.1f}시간) 🎉"
+        return f"어제의 나를 넘어서고 있습니다! (+{improvement:.1f}시간) 🎉"
     elif today_hours < yesterday_hours:
         gap = yesterday_hours - today_hours
         return f"이길 수 있어요 힘내요! (어제보다 -{gap:.1f}시간) 💪"
     return None
 
 # --- App Initialization ---
-init_db()
+with app.app_context():
+    db.create_all()
 
 # --- Routes ---
 @app.route('/')
@@ -99,23 +88,23 @@ def record_session():
     if duration < 60:
         return jsonify({'message': 'Session too short, not recorded'}), 400
 
-    custom_date = get_custom_date()
-    start_str = datetime.fromtimestamp(data['start_time']).strftime('%Y-%m-%d %H:%M:%S')
-    end_str = datetime.fromtimestamp(data['end_time']).strftime('%Y-%m-%d %H:%M:%S')
-
+    new_session = StudySession(
+        Date=get_custom_date(),
+        Subject=data['subject'],
+        StartTime=datetime.fromtimestamp(data['start_time']).strftime('%Y-%m-%d %H:%M:%S'),
+        EndTime=datetime.fromtimestamp(data['end_time']).strftime('%Y-%m-%d %H:%M:%S'),
+        Duration=int(duration)
+    )
+    
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO study_sessions (Date, Subject, StartTime, EndTime, Duration) VALUES (?, ?, ?, ?, ?)",
-                (custom_date, data['subject'], start_str, end_str, int(duration))
-            )
-            conn.commit()
+        db.session.add(new_session)
+        db.session.commit()
         return jsonify({
             'message': 'Session recorded successfully',
             'duration_minutes': round(duration / 60, 2)
         })
-    except sqlite3.Error as e:
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': 'Database record failed', 'details': str(e)}), 500
 
 @app.route('/api/today-stats')
@@ -125,29 +114,25 @@ def get_today_stats():
         today_date = get_custom_date()
         yesterday_date = get_yesterday_date()
         
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # 오늘의 총 공부 시간
-            cursor.execute("SELECT SUM(Duration) FROM study_sessions WHERE Date = ?", (today_date,))
-            today_total_seconds = cursor.fetchone()[0] or 0
+        # 오늘의 총 공부 시간
+        today_total_seconds = db.session.query(func.sum(StudySession.Duration)).filter_by(Date=today_date).scalar() or 0
+        
+        # 어제의 총 공부 시간
+        yesterday_total_seconds = db.session.query(func.sum(StudySession.Duration)).filter_by(Date=yesterday_date).scalar() or 0
 
-            # 어제의 총 공부 시간
-            cursor.execute("SELECT SUM(Duration) FROM study_sessions WHERE Date = ?", (yesterday_date,))
-            yesterday_total_seconds = cursor.fetchone()[0] or 0
-
-            # 오늘의 과목별 공부 시간
-            cursor.execute("SELECT Subject, SUM(Duration) FROM study_sessions WHERE Date = ? GROUP BY Subject", (today_date,))
-            subject_rows = cursor.fetchall()
+        # 오늘의 과목별 공부 시간
+        subject_rows = db.session.query(
+            StudySession.Subject, func.sum(StudySession.Duration)
+        ).filter_by(Date=today_date).group_by(StudySession.Subject).all()
 
         today_total_hours = today_total_seconds / 3600
         yesterday_total_hours = yesterday_total_seconds / 3600
         
         subject_times = {
-            row['Subject']: {
-                'minutes': row['SUM(Duration)'] / 60,
-                'hours': row['SUM(Duration)'] / 3600
-            } for row in subject_rows
+            subject: {
+                'minutes': duration / 60,
+                'hours': duration / 3600
+            } for subject, duration in subject_rows
         }
 
         motivation_message = get_motivation_message(today_total_hours, yesterday_total_hours)
@@ -162,7 +147,7 @@ def get_today_stats():
             response_data['motivation_message'] = motivation_message
 
         return jsonify(response_data)
-    except sqlite3.Error as e:
+    except Exception as e:
         return jsonify({'error': 'Failed to retrieve today stats', 'details': str(e)}), 500
 
 @app.route('/api/statistics/<int:days>')
@@ -171,30 +156,28 @@ def get_statistics(days):
     try:
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # 총 공부 시간
-            cursor.execute("SELECT SUM(Duration) FROM study_sessions WHERE Date >= ?", (cutoff_date,))
-            total_time = cursor.fetchone()[0] or 0
+        # 총 공부 시간
+        total_time = db.session.query(func.sum(StudySession.Duration)).filter(StudySession.Date >= cutoff_date).scalar() or 0
 
-            # 과목별 공부 시간
-            cursor.execute("SELECT Subject, SUM(Duration) FROM study_sessions WHERE Date >= ? GROUP BY Subject", (cutoff_date,))
-            subject_rows = cursor.fetchall()
-            
-            # 일별 공부 시간
-            cursor.execute("SELECT Date, SUM(Duration) FROM study_sessions WHERE Date >= ? GROUP BY Date", (cutoff_date,))
-            daily_rows = cursor.fetchall()
+        # 과목별 공부 시간
+        subject_rows = db.session.query(
+            StudySession.Subject, func.sum(StudySession.Duration)
+        ).filter(StudySession.Date >= cutoff_date).group_by(StudySession.Subject).all()
+        
+        # 일별 공부 시간
+        daily_rows = db.session.query(
+            StudySession.Date, func.sum(StudySession.Duration)
+        ).filter(StudySession.Date >= cutoff_date).group_by(StudySession.Date).all()
 
         subject_times = {
-            row['Subject']: {
-                'minutes': round(row['SUM(Duration)'] / 60, 2),
-                'hours': round(row['SUM(Duration)'] / 3600, 2)
-            } for row in subject_rows
+            subject: {
+                'minutes': round(duration / 60, 2),
+                'hours': round(duration / 3600, 2)
+            } for subject, duration in subject_rows
         }
         
         daily_stats = {
-            row['Date']: round(row['SUM(Duration)'] / 3600, 2) for row in daily_rows
+            date: round(duration / 3600, 2) for date, duration in daily_rows
         }
         
         return jsonify({
@@ -205,7 +188,7 @@ def get_statistics(days):
             'subject_times': subject_times,
             'daily_stats': daily_stats
         })
-    except sqlite3.Error as e:
+    except Exception as e:
         return jsonify({'error': 'Failed to retrieve statistics', 'details': str(e)}), 500
 
 @app.route('/api/subject-comparison')
@@ -215,38 +198,35 @@ def get_subject_comparison():
         periods = [3, 7, 14, 30]
         comparison_data = {}
         
-        with get_db_connection() as conn:
-            for days in periods:
-                cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT Subject, SUM(Duration) as TotalDuration FROM study_sessions WHERE Date >= ? GROUP BY Subject",
-                    (cutoff_date,)
-                )
-                rows = cursor.fetchall()
-                
-                period_stats = {subject: {'minutes': 0, 'hours': 0, 'seconds': 0} for subject in SUBJECTS}
-                total_time = 0
-                
-                for row in rows:
-                    subject = row['Subject']
-                    duration = row['TotalDuration']
-                    if subject in period_stats:
-                        period_stats[subject] = {
-                            'minutes': round(duration / 60, 2),
-                            'hours': round(duration / 3600, 2),
-                            'seconds': duration
-                        }
-                    total_time += duration
-                
-                comparison_data[f'{days}days'] = {
-                    'total_hours': round(total_time / 3600, 2),
-                    'average_per_day': round(total_time / 3600 / days, 2) if days > 0 else 0,
-                    'subjects': period_stats
-                }
+        for days in periods:
+            cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            
+            rows = db.session.query(
+                StudySession.Subject, func.sum(StudySession.Duration).label('TotalDuration')
+            ).filter(StudySession.Date >= cutoff_date).group_by(StudySession.Subject).all()
+            
+            period_stats = {subject: {'minutes': 0, 'hours': 0, 'seconds': 0} for subject in SUBJECTS}
+            total_time = 0
+            
+            for row in rows:
+                subject = row.Subject
+                duration = row.TotalDuration
+                if subject in period_stats:
+                    period_stats[subject] = {
+                        'minutes': round(duration / 60, 2),
+                        'hours': round(duration / 3600, 2),
+                        'seconds': duration
+                    }
+                total_time += duration
+            
+            comparison_data[f'{days}days'] = {
+                'total_hours': round(total_time / 3600, 2),
+                'average_per_day': round(total_time / 3600 / days, 2) if days > 0 else 0,
+                'subjects': period_stats
+            }
         
         return jsonify(comparison_data)
-    except sqlite3.Error as e:
+    except Exception as e:
         return jsonify({'error': 'Failed to retrieve subject comparison', 'details': str(e)}), 500
 
 @app.route('/api/health')
@@ -255,4 +235,7 @@ def health_check():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 # if __name__ == '__main__':
+#     # 로컬 테스트용: python app.py 실행 시
+#     with app.app_context():
+#         db.create_all()
 #     app.run(debug=True, host='0.0.0.0', port=5001)
