@@ -290,11 +290,9 @@ def get_streak_info():
                 days_since_last_study = (current_date - last_study_day).days
                 
                 if days_since_last_study == 1:
-                     message = "어제는 쉬셨네요. 오늘은 다시 시작해볼까요? 💪"
+                     message = "오늘의 공부를 시작해볼까요? 꾸준함이 중요해요! 🚀"
                 elif days_since_last_study > 1:
                      message = f"{days_since_last_study}일 동안 쉬셨네요. 다시 함께 달려봐요! 🚀"
-                else:
-                      message = "오늘 공부 기록이 있습니다! 화이팅!"
             else:
                  message = "오늘부터 새로운 시작! 화이팅! 🌟"
 
