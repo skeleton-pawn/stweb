@@ -235,6 +235,79 @@ def get_subject_comparison():
     except Exception as e:
         return jsonify({'error': 'Failed to retrieve subject comparison', 'details': str(e)}), 500
 
+@app.route('/history')
+def history_page():
+    """학습 기록 상세 페이지를 렌더링합니다."""
+    return render_template('history.html')
+
+@app.route('/api/streak-info')
+def get_streak_info():
+    """연속 학습일, 빠진 날, 응원 메시지를 반환합니다."""
+    try:
+        # 1. DB에서 모든 학습 날짜를 중복 없이 가져오기
+        all_study_dates_query = db.session.query(StudySession.Date).distinct().all()
+        all_study_dates = {row[0] for row in all_study_dates_query}
+
+        if not all_study_dates:
+            return jsonify({
+                'streak_days': 0,
+                'missed_days': [],
+                'message': '첫 공부를 시작해보세요!'
+            })
+
+        # 2. 연속 학습일 계산
+        streak_days = 0
+        current_date_str = get_custom_date()
+        current_date = datetime.strptime(current_date_str, '%Y-%m-%d').date()
+        
+        if current_date_str in all_study_dates:
+            streak_days = 1
+            check_date = current_date - timedelta(days=1)
+            while (check_date.strftime('%Y-%m-%d') in all_study_dates):
+                streak_days += 1
+                check_date -= timedelta(days=1)
+        
+        # 3. 빠진 날 계산
+        first_day_str = min(all_study_dates)
+        first_day = datetime.strptime(first_day_str, '%Y-%m-%d').date()
+        
+        missed_days = []
+        # 첫 공부날부터 오늘까지 모든 날짜를 확인
+        for i in range((current_date - first_day).days + 1):
+            check_date = first_day + timedelta(days=i)
+            check_date_str = check_date.strftime('%Y-%m-%d')
+            if check_date_str not in all_study_dates:
+                missed_days.append(check_date_str)
+        
+        # 4. 응원 메시지 생성
+        message = ""
+        if streak_days > 0:
+            message = f"연속 {streak_days}일째 공부 중입니다! 대단해요! 🔥"
+        else:
+            last_study_day_str = max(all_study_dates) if all_study_dates else None
+            if last_study_day_str:
+                last_study_day = datetime.strptime(last_study_day_str, '%Y-%m-%d').date()
+                days_since_last_study = (current_date - last_study_day).days
+                
+                if days_since_last_study == 1:
+                     message = "어제는 쉬셨네요. 오늘은 다시 시작해볼까요? 💪"
+                elif days_since_last_study > 1:
+                     message = f"{days_since_last_study}일 동안 쉬셨네요. 다시 함께 달려봐요! 🚀"
+                else:
+                      message = "오늘 공부 기록이 있습니다! 화이팅!"
+            else:
+                 message = "오늘부터 새로운 시작! 화이팅! 🌟"
+
+
+        return jsonify({
+            'streak_days': streak_days,
+            'missed_days': sorted(missed_days, reverse=True),
+            'message': message
+        })
+
+    except Exception as e:
+        return jsonify({'error': 'Failed to retrieve streak info', 'details': str(e)}), 500
+
 @app.route('/api/health')
 def health_check():
     """서버 상태를 확인합니다."""

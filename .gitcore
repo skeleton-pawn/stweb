@@ -5,3 +5,6 @@ __pycache__/
 # 운영체제/에디터 파일
 .DS_Store
 .vscode/
+
+# venv 파일 무시
+venv/

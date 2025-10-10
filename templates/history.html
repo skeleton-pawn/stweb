@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학습 기록 - stweb</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 24px;
+        }
+        h1, h2 {
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        #streak-message {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #1877f2;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #missed-days-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        #missed-days-list li {
+            background-color: #f7f7f7;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 1em;
+            color: #606770;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2em;
+        }
+        .home-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            text-decoration: none;
+            color: #1877f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>나의 학습 기록</h1>
+        <div id="streak-message" class="loading">로딩 중...</div>
+        
+        <h2>공부하지 않은 날</h2>
+        <ul id="missed-days-list">
+            <!-- 데이터가 여기에 동적으로 추가됩니다. -->
+        </ul>
+        <a href="/" class="home-link">메인으로 돌아가기</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/streak-info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.details);
+                    }
+                    
+                    const streakMessageEl = document.getElementById('streak-message');
+                    streakMessageEl.textContent = data.message;
+                    streakMessageEl.classList.remove('loading');
+
+                    const missedDaysListEl = document.getElementById('missed-days-list');
+                    if (data.missed_days && data.missed_days.length > 0) {
+                        data.missed_days.forEach(day => {
+                            const li = document.createElement('li');
+                            li.textContent = `${day} 공부를 하지 않으셨습니다`;
+                            missedDaysListEl.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement('li');
+                        li.textContent = '빠짐없이 공부하셨네요. 완벽해요!';
+                        missedDaysListEl.appendChild(li);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching streak info:', error);
+                    document.getElementById('streak-message').textContent = '기록을 불러오는 데 실패했습니다.';
+                });
+        });
+    </script>
+</body>
+</html>
