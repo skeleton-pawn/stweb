@@ -35,18 +35,20 @@ class StudySession(db.Model):
     def __repr__(self):
         return f'<StudySession {self.Subject} on {self.Date}>'
 
+from zoneinfo import ZoneInfo
+
 # --- Helper Functions ---
 def get_custom_date():
-    """3AM 기준으로 날짜를 계산합니다."""
-    now = datetime.now()
-    if now.hour < 3:
+    """5AM 기준으로 날짜를 계산합니다."""
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    if now.hour < 5:
         return (now - timedelta(days=1)).strftime('%Y-%m-%d')
     return now.strftime('%Y-%m-%d')
 
 def get_yesterday_date():
-    """어제 날짜를 계산합니다 (3AM 기준)."""
-    now = datetime.now()
-    if now.hour < 3:
+    """어제 날짜를 계산합니다 (5AM 기준)."""
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    if now.hour < 5:
         return (now - timedelta(days=2)).strftime('%Y-%m-%d')
     return (now - timedelta(days=1)).strftime('%Y-%m-%d')
 
