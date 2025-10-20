@@ -201,7 +201,7 @@ def get_statistics(days):
 def get_subject_comparison():
     """기간별 과목 통계를 비교하여 반환합니다."""
     try:
-        periods = [3, 7, 14, 30]
+        periods = [3, 7, 14, 30, 180]
         comparison_data = {}
         
         for days in periods:
