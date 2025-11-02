@@ -9,13 +9,9 @@ app = Flask(__name__)
 CORS(app)
 
 # --- Database Setup ---
-# Render에서 제공하는 DATABASE_URL 환경 변수를 사용합니다.
-# SQLAlchemy가 'postgres://' 대신 'postgresql://'을 인식하므로 URL을 수정합니다.
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///local_database.db')
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+# PostgreSQL 연결 설정
+# 사용자: stweb, 데이터베이스: stweb_data
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://stweb:c1stweb@localhost:5432/stweb_data'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
