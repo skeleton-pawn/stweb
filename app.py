@@ -62,8 +62,6 @@ def get_motivation_message(today_hours, yesterday_hours):
     return None
 
 # --- App Initialization ---
-with app.app_context():
-    db.create_all()
 
 # --- Routes ---
 @app.route('/')
@@ -307,8 +305,14 @@ def health_check():
     """서버 상태를 확인합니다."""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
-# if __name__ == '__main__':
-#     # 로컬 테스트용: python app.py 실행 시
-#     with app.app_context():
-#         db.create_all()
-#     app.run(debug=True, host='0.0.0.0', port=5001)
+# --- CLI Commands ---
+@app.cli.command("init-db")
+def init_db_command():
+    """Initializes the database."""
+    with app.app_context():
+        db.create_all()
+    print("Database initialized.")
+
+if __name__ == '__main__':
+    # 로컬 테스트용: python app.py 실행 시
+    app.run(debug=True, host='0.0.0.0', port=5001)
