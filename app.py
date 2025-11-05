@@ -16,7 +16,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-SUBJECTS = ["원가", "세법", "재정", "행정", "세회", "재무", "독서", "craft"]
+SUBJECTS = ["원가", "세법", "재정", "행정", "세회", "재무", "독서", "craft", "운동"]
 
 # --- Database Model ---
 class StudySession(db.Model):
