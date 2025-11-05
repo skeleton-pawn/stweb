@@ -206,6 +206,155 @@
             cursor: not-allowed;
             transform: none;
         }
+        /* 운동 섹션 스타일 */
+        .exercise-section {
+            border-top: 2px solid #eee;
+            padding-top: 30px;
+            margin-top: 30px;
+        }
+
+        .exercise-section h2 {
+            color: #ff6b6b;
+            margin-bottom: 20px;
+        }
+
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .preset-btn {
+            padding: 15px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+
+        .preset-btn:hover {
+            border-color: #ff6b6b;
+            background: #fff5f5;
+        }
+
+        .preset-btn.selected {
+            background: #ff6b6b;
+            color: white;
+            border-color: #ff6b6b;
+        }
+
+        .btn-apply {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-apply:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-apply:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 확인 모달 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            animation: slideUp 0.3s;
+        }
+
+        .modal-content h3 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .btn-proceed {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-proceed:hover, .btn-cancel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
 
         .tabs {
             display: flex;
@@ -418,6 +567,20 @@
                 <button class="btn btn-start" id="start-btn" onclick="startTimer()">시작</button>
                 <button class="btn btn-stop" id="stop-btn" onclick="stopTimer()" disabled>정지</button>
             </div>
+        
+            <!-- 운동 섹션 추가 -->
+            <div class="exercise-section">
+                <h2>💪 운동 시간 기록</h2>
+                <div class="preset-buttons">
+                    <button class="preset-btn" data-minutes="30">30분</button>
+                    <button class="preset-btn" data-minutes="60">60분</button>
+                    <button class="preset-btn" data-minutes="90">90분</button>
+                    <button class="preset-btn" data-minutes="120">120분</button>
+                </div>
+                <div style="text-align: center;">
+                    <button class="btn-apply" id="apply-btn" onclick="applyExercise()">Apply</button>
+                </div>
+            </div>
         </div>
 
         <!-- 통계 탭 -->
@@ -443,6 +606,20 @@
                 </div>
             </div>
         </div>
+    </div> 
+
+        <!-- 확인 모달 -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <h3>🏊‍♂️ 운동 기록 확인</h3>
+            <p id="modal-message">총 60분 맞습니까?</p>
+            <div class="modal-buttons">
+                <button class="btn-proceed" onclick="proceedExercise()">Proceed</button>
+                <button class="btn-cancel" onclick="cancelExercise()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 알림 -->
     <div id="notification" class="notification"></div>
 
@@ -455,6 +632,9 @@
         let isRunning = false;
         let charts = {};
 
+        // 운동 관련 변수
+        let selectedExerciseMinutes = null;
+
         // 초기화
         document.addEventListener('DOMContentLoaded', function() {
             loadSubjects();
@@ -464,7 +644,86 @@
             setInterval(updateCurrentTime, 1000);
             loadStatistics();
             loadSubjectComparison();
+
+            // 운동 프리셋 버튼 이벤트 리스너
+            setupExerciseButtons();
         });
+
+        // 운동 버튼 설정
+        function setupExerciseButtons() {
+            const presetButtons = document.querySelectorAll('.preset-btn');
+            presetButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    presetButtons.forEach(b => b.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedExerciseMinutes = parseInt(this.dataset.minutes);
+                });
+            });
+        }
+
+        // 운동 Apply 버튼
+        function applyExercise() {
+            if (!selectedExerciseMinutes) {
+                showNotification('운동 시간을 선택해주세요', 'error');
+                return;
+            }
+
+            // 모달 표시
+            const modal = document.getElementById('confirmation-modal');
+            const message = document.getElementById('modal-message');
+            message.textContent = `총 ${selectedExerciseMinutes}분 맞습니까?`;
+            modal.classList.add('show');
+        }
+
+        // 운동 Proceed
+        async function proceedExercise() {
+            const modal = document.getElementById('confirmation-modal');
+            modal.classList.remove('show');
+
+            if (!selectedExerciseMinutes) return;
+
+            // 현재 시간에서 역산
+            const endTime = Date.now() / 1000; // 초 단위
+            const startTime = endTime - (selectedExerciseMinutes * 60); // 분을 초로 변환
+            const duration = selectedExerciseMinutes * 60; // 초 단위
+
+            try {
+                const response = await fetch('/api/record-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject: '운동',
+                        start_time: startTime,
+                        end_time: endTime,
+                        duration: duration
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification(`운동 ${selectedExerciseMinutes}분 기록 완료! 💪`, 'success');
+                    loadTodayStats();
+                    loadStreakInfo();
+                    loadStatistics();
+                    loadSubjectComparison();
+                    
+                    // 선택 초기화
+                    document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('selected'));
+                    selectedExerciseMinutes = null;
+                } else {
+                    showNotification(result.message || '기록 실패', 'error');
+                }
+            } catch (error) {
+                showNotification('서버 통신 오류. 네트워크를 확인해주세요.', 'error');
+            }
+        }
+
+        // 운동 Cancel
+        function cancelExercise() {
+            const modal = document.getElementById('confirmation-modal');
+            modal.classList.remove('show');
+        }
 
         // 연속 학습일 정보 로드 (새로 추가된 함수)
         async function loadStreakInfo() {
@@ -503,8 +762,9 @@
                 
                 const selector = document.getElementById('subject-selector');
                 selector.innerHTML = '';
-                
-                subjects.forEach(subject => {
+    
+                // "운동" 제외하고 표시
+                subjects.filter(s => s !== '운동').forEach(subject => {
                     const btn = document.createElement('button');
                     btn.className = 'subject-btn';
                     btn.textContent = subject;
@@ -527,7 +787,7 @@
             });
         }
 
-        // [수정 1] 동기부여 메시지 표시를 위한 새로운 함수
+        // 동기부여 메시지 표시를 위한 새로운 함수
         function showMotivationMessage(message) {
             // 기존 메시지가 있다면 먼저 제거
             const existingMessage = document.getElementById('motivation-message');
@@ -544,7 +804,7 @@
             messageDiv.className = 'motivation-message';
             messageDiv.textContent = message;
             
-            // [수정 2] 메시지를 화면에 실제로 추가하는 누락된 코드
+            // 메시지를 화면에 실제로 추가하는 누락된 코드
             const parentCard = document.querySelector('.today-stats').parentElement;
             const subjectStats = document.getElementById('subject-stats');
             parentCard.insertBefore(messageDiv, subjectStats);
