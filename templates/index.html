@@ -631,6 +631,7 @@
         let startTime = null;
         let isRunning = false;
         let charts = {};
+        let subjectComparisonData = null; // [추가] 과목별 비교 데이터 캐시 변수
 
         // 운동 관련 변수
         let selectedExerciseMinutes = null;
@@ -678,17 +679,22 @@
         // 운동 Proceed
         async function proceedExercise() {
             const modal = document.getElementById('confirmation-modal');
-            modal.classList.remove('show');
+            const proceedBtn = modal.querySelector('.btn-proceed');
 
-            if (!selectedExerciseMinutes) return;
+            // 이미 실행 중이거나 선택된 시간이 없으면 중단
+            if (!selectedExerciseMinutes || proceedBtn.disabled) return;
 
-            // 현재 시간에서 역산
-            const endTime = Date.now() / 1000; // 초 단위
-            const startTime = endTime - (selectedExerciseMinutes * 60); // 분을 초로 변환
-            const duration = selectedExerciseMinutes * 60; // 초 단위
+            // [개선 1] 중복 클릭 방지를 위해 버튼 비활성화
+            proceedBtn.disabled = true;
+            proceedBtn.textContent = '기록 중...';
 
             try {
-                const response = await fetch('/api/record-session', {
+                const endTime = Date.now() / 1000; // 초 단위
+                const startTime = endTime - (selectedExerciseMinutes * 60); // 분을 초로 변환
+                const duration = selectedExerciseMinutes * 60; // 초 단위
+
+                // 첫 번째 기록 시도
+                let response = await fetch('/api/record-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -699,10 +705,41 @@
                     })
                 });
 
-                const result = await response.json();
+                let result = await response.json();
 
+                // [개선 2] 시간 중첩 오류(서버에서 409 Conflict 응답) 발생 시, 시간 조정 후 재시도
+                if (!response.ok && response.status === 409 && result.error === 'Time overlap' && result.last_activity_end_time) {
+                    showNotification('시간이 중첩되어 기록을 자동 조정합니다.', 'success');
+                    
+                    const newStartTime = result.last_activity_end_time + 1; // 마지막 활동 바로 다음 시간부터 시작
+                    const newDuration = endTime - newStartTime;
+
+                    if (newDuration <= 1) { // 1초 이하는 무시
+                        showNotification('이전 활동과 겹쳐 기록할 시간이 없습니다.', 'error');
+                        return; // finally 블록에서 버튼 상태를 복구하고 종료
+                    }
+                    
+                    // 조정된 시간으로 재시도
+                    response = await fetch('/api/record-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            subject: '운동',
+                            start_time: newStartTime,
+                            end_time: endTime,
+                            duration: newDuration
+                        })
+                    });
+                    result = await response.json();
+                }
+
+                // 최종 결과 처리
                 if (response.ok) {
-                    showNotification(`운동 ${selectedExerciseMinutes}분 기록 완료! 💪`, 'success');
+                    // 서버로부터 실제 기록된 시간을 받아와 메시지에 사용 (정확성 향상)
+                    const recordedMinutes = (result.duration_seconds / 60).toFixed(1);
+                    showNotification(`운동 ${recordedMinutes}분 기록 완료! 💪`, 'success');
+                    
+                    subjectComparisonData = null;
                     loadTodayStats();
                     loadStreakInfo();
                     loadStatistics();
@@ -714,8 +751,14 @@
                 } else {
                     showNotification(result.message || '기록 실패', 'error');
                 }
+
             } catch (error) {
                 showNotification('서버 통신 오류. 네트워크를 확인해주세요.', 'error');
+            } finally {
+                // 성공, 실패, 오류 여부와 관계없이 모달을 닫고 버튼을 원상태로 복구
+                modal.classList.remove('show');
+                proceedBtn.disabled = false;
+                proceedBtn.textContent = 'Proceed';
             }
         }
 
@@ -804,7 +847,6 @@
             messageDiv.className = 'motivation-message';
             messageDiv.textContent = message;
             
-            // 메시지를 화면에 실제로 추가하는 누락된 코드
             const parentCard = document.querySelector('.today-stats').parentElement;
             const subjectStats = document.getElementById('subject-stats');
             parentCard.insertBefore(messageDiv, subjectStats);
@@ -891,6 +933,7 @@
                 
                 if (response.ok) {
                     showNotification(`${result.duration_minutes}분 기록 완료!`, 'success');
+                    subjectComparisonData = null; // [추가] 데이터 캐시 초기화
                     loadTodayStats(); // 이 함수가 동기부여 메시지를 포함한 모든 통계를 새로고침합니다.
                     loadStreakInfo(); // 연속 학습일 정보도 새로고침
                     loadStatistics();
@@ -991,51 +1034,21 @@
 
         // 과목별 비교 통계 로드
         async function loadSubjectComparison() {
+            // [수정] 캐시된 데이터가 있으면 즉시 렌더링하고 함수 종료
+            if (subjectComparisonData) {
+                renderSubjectComparison(subjectComparisonData);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/subject-comparison');
                 const data = await response.json();
                 
-                const container = document.getElementById('subject-comparison');
-                container.innerHTML = '';
-                container.className = 'comparison-grid';
+                // [추가] API 결과를 캐시에 저장
+                subjectComparisonData = data;
                 
-                const periods = [
-                    { key: '3days', title: '최근 3일' },
-                    { key: '7days', title: '최근 7일' },
-                    { key: '14days', title: '최근 14일' },
-                    { key: '30days', title: '최근 30일' },
-                    { key: '180days', title: '지금까지 공부 시간(최대 6개월)' }
-                ];
-                
-                periods.forEach(period => {
-                    const periodData = data[period.key];
-                    if (!periodData) return;
-                    
-                    const card = document.createElement('div');
-                    card.className = 'period-card';
-                    
-                    let subjectRows = Object.entries(periodData.subjects)
-                        .filter(([_, stats]) => stats.hours > 0)
-                        .map(([subject, stats]) => `
-                            <div class="subject-row">
-                                <span class="subject-name">${subject}</span>
-                                <span class="subject-time">${stats.hours}시간</span>
-                            </div>
-                        `).join('');
-                    
-                    card.innerHTML = `
-                        <div class="period-title">${period.title}</div>
-                        <div class="period-summary">
-                            총 ${periodData.total_hours}시간<br>
-                            평균 ${periodData.average_per_day}시간/일
-                        </div>
-                        <div class="subject-breakdown">
-                            ${subjectRows || '<div style="text-align: center; color: #999;">공부 기록이 없습니다</div>'}
-                        </div>
-                    `;
-                    
-                    container.appendChild(card);
-                });
+                // [수정] 렌더링 로직을 별도 함수로 호출
+                renderSubjectComparison(data);
                 
             } catch (error) {
                 console.error('Failed to load subject comparison:', error);
@@ -1043,11 +1056,66 @@
             }
         }
 
+        // [추가] 과목별 비교 데이터를 화면에 렌더링하는 함수 분리
+        function renderSubjectComparison(data) {
+            const container = document.getElementById('subject-comparison');
+            container.innerHTML = '';
+            container.className = 'comparison-grid';
+            
+            const periods = [
+                { key: '3days', title: '최근 3일' },
+                { key: '7days', title: '최근 7일' },
+                { key: '14days', title: '최근 14일' },
+                { key: '30days', title: '최근 30일' },
+                { key: '180days', title: '지금까지 공부 시간(최대 6개월)' }
+            ];
+            
+            periods.forEach(period => {
+                const periodData = data[period.key];
+                if (!periodData) return;
+                
+                const card = document.createElement('div');
+                card.className = 'period-card';
+                
+                let subjectRows = Object.entries(periodData.subjects)
+                    .filter(([_, stats]) => stats.hours > 0)
+                    .map(([subject, stats]) => `
+                        <div class="subject-row">
+                            <span class="subject-name">${subject}</span>
+                            <span class="subject-time">${stats.hours}시간</span>
+                        </div>
+                    `).join('');
+                
+                card.innerHTML = `
+                    <div class="period-title">${period.title}</div>
+                    <div class="period-summary">
+                        총 ${periodData.total_hours}시간<br>
+                        평균 ${periodData.average_per_day}시간/일
+                    </div>
+                    <div class="subject-breakdown">
+                        ${subjectRows || '<div style="text-align: center; color: #999;">공부 기록이 없습니다</div>'}
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
         // 과목별 차트 데이터 로드 및 생성
         async function loadAndCreateSubjectChart() {
+            // [수정] 캐시된 데이터가 있으면 즉시 차트 생성
+            if (subjectComparisonData) {
+                createSubjectComparisonChart(subjectComparisonData);
+                return;
+            }
+
             try {
                 const response = await fetch('/api/subject-comparison');
                 const data = await response.json();
+
+                // [추가] API 결과를 캐시에 저장
+                subjectComparisonData = data;
+
                 createSubjectComparisonChart(data);
             } catch (error) {
                 console.error('Failed to load subject comparison for charts:', error);
