@@ -3,10 +3,13 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from datetime import datetime, timedelta
 import os
+from dotenv import load_dotenv
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
+
+# .env 파일 로드
+load_dotenv()
 
 app = Flask(__name__)
 # 세션 보안을 위한 시크릿 키 설정 (실제 운영 시에는 안전한 난수로 변경 필요)
