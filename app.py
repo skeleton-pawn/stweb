@@ -290,6 +290,22 @@ def history_page():
     """학습 기록 상세 페이지를 렌더링합니다."""
     return render_template('history.html')
 
+@app.route('/api/sessions/<date>')
+@login_required
+def get_sessions_by_date(date):
+    """특정 날짜의 모든 학습 세션을 가져옵니다."""
+    try:
+        sessions = StudySession.query.filter_by(Date=date).order_by(StudySession.StartTime).all()
+        return jsonify([{
+            'id': s.id,
+            'subject': s.Subject,
+            'start_time': s.StartTime,
+            'end_time': s.EndTime,
+            'duration': s.Duration
+        } for s in sessions])
+    except Exception as e:
+        return jsonify({'error': 'Failed to fetch sessions', 'details': str(e)}), 500
+
 @app.route('/api/streak-info')
 @login_required
 def get_streak_info():

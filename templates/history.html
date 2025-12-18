@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,19 +15,58 @@
             display: flex;
             justify-content: center;
         }
+
         .container {
             width: 100%;
             max-width: 600px;
             background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 24px;
         }
-        h1, h2 {
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-            margin-top: 0;
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
         }
+
+        /* Tabs Style */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 25px;
+            border: 1px solid #dee2e6;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 1em;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: #1877f2;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         #streak-message {
             font-size: 1.5em;
             font-weight: bold;
@@ -34,76 +74,365 @@
             text-align: center;
             margin-bottom: 20px;
         }
+
         #missed-days-list {
             list-style-type: none;
             padding: 0;
         }
+
         #missed-days-list li {
             background-color: #f7f7f7;
             padding: 12px;
-            border-radius: 6px;
+            border-radius: 8px;
             margin-bottom: 8px;
             font-size: 1em;
             color: #606770;
+            border-left: 4px solid #ccd0d5;
         }
+
+        /* Manual Input Form Style */
+        .manual-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-weight: bold;
+            color: #4b4f56;
+            font-size: 0.9em;
+        }
+
+        input,
+        select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .btn-submit {
+            background: #1877f2;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-submit:hover {
+            background: #166fe5;
+        }
+
+        /* Occupied Slots Style */
+        .occupied-slots {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff9e6;
+            border-radius: 8px;
+            border: 1px solid #ffeeba;
+        }
+
+        .occupied-title {
+            font-weight: bold;
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .slot-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .slot-item {
+            background: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ffeeba;
+            font-size: 0.85em;
+            color: #856404;
+        }
+
         .loading {
             text-align: center;
             padding: 20px;
             font-size: 1.2em;
         }
+
         .home-link {
             display: block;
             text-align: center;
-            margin-top: 20px;
+            margin-top: 30px;
             text-decoration: none;
             color: #1877f2;
             font-weight: bold;
         }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .notification.success {
+            background: #4caf50;
+            display: block;
+        }
+
+        .notification.error {
+            background: #f44336;
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
-        <h1>나의 학습 기록</h1>
-        <div id="streak-message" class="loading">로딩 중...</div>
-        
-        <h2>공부하지 않은 날</h2>
-        <ul id="missed-days-list">
-            <!-- 데이터가 여기에 동적으로 추가됩니다. -->
-        </ul>
+        <h1>공부 기록 관리</h1>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('streak')">🔥 학습 현황</button>
+            <button class="tab" onclick="showTab('manual')">✏️ 수동 입력</button>
+        </div>
+
+        <!-- 탭 1: 학습 현황 -->
+        <div id="streak-content" class="tab-content active">
+            <div id="streak-message" class="loading">로딩 중...</div>
+            <h2>공부하지 않은 날</h2>
+            <ul id="missed-days-list">
+                <!-- 데이터가 여기에 동적으로 추가됩니다 -->
+            </ul>
+        </div>
+
+        <!-- 탭 2: 수동 입력 -->
+        <div id="manual-content" class="tab-content">
+            <form class="manual-form" id="manual-form">
+                <div class="form-group">
+                    <label>날짜</label>
+                    <input type="date" id="input-date" required>
+                </div>
+
+                <!-- 이미 기록된 시간대 표시 영역 -->
+                <div id="occupied-slots-container" class="occupied-slots" style="display: none;">
+                    <div class="occupied-title">⚠️ 이미 기록된 시간대</div>
+                    <div class="slot-list" id="slot-list"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>과목</label>
+                    <select id="input-subject" required>
+                        <option value="">과목 선택</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>시작 시간</label>
+                        <input type="time" id="input-start" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>종료 시간</label>
+                        <input type="time" id="input-end" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit">기록 완료</button>
+            </form>
+        </div>
+
         <a href="/" class="home-link">메인으로 돌아가기</a>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            fetch('/api/streak-info')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        throw new Error(data.details);
-                    }
-                    
-                    const streakMessageEl = document.getElementById('streak-message');
-                    streakMessageEl.textContent = data.message;
-                    streakMessageEl.classList.remove('loading');
+    <div id="notification" class="notification"></div>
 
-                    const missedDaysListEl = document.getElementById('missed-days-list');
-                    if (data.missed_days && data.missed_days.length > 0) {
-                        data.missed_days.forEach(day => {
-                            const li = document.createElement('li');
-                            li.textContent = `${day} 공부를 하지 않으셨습니다`;
-                            missedDaysListEl.appendChild(li);
-                        });
-                    } else {
-                        const li = document.createElement('li');
-                        li.textContent = '빠짐없이 공부하셨네요. 완벽해요!';
-                        missedDaysListEl.appendChild(li);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching streak info:', error);
-                    document.getElementById('streak-message').textContent = '기록을 불러오는 데 실패했습니다.';
-                });
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // 초기 데이터 로드
+            loadStreakInfo();
+            loadSubjects();
+
+            // 오늘 날짜로 기본값 설정
+            document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+            fetchOccupiedSlots(document.getElementById('input-date').value);
+
+            // 날짜 변경 시 기입된 시간대 확인
+            document.getElementById('input-date').addEventListener('change', (e) => {
+                fetchOccupiedSlots(e.target.value);
+            });
+
+            // 수동 입력 폼 제출
+            document.getElementById('manual-form').addEventListener('submit', handleManualSubmit);
         });
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`${tabName}-content`).classList.add('active');
+        }
+
+        async function loadStreakInfo() {
+            try {
+                const response = await fetch('/api/streak-info');
+                const data = await response.json();
+
+                const streakMessageEl = document.getElementById('streak-message');
+                streakMessageEl.textContent = data.message;
+                streakMessageEl.classList.remove('loading');
+
+                const missedDaysListEl = document.getElementById('missed-days-list');
+                missedDaysListEl.innerHTML = '';
+
+                if (data.missed_days && data.missed_days.length > 0) {
+                    data.missed_days.forEach(day => {
+                        const li = document.createElement('li');
+                        li.textContent = `${day} 공부를 하지 않으셨습니다`;
+                        missedDaysListEl.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = '빠짐없이 공부하셨네요. 완벽해요!';
+                    missedDaysListEl.appendChild(li);
+                }
+            } catch (error) {
+                console.error('Error fetching streak info:', error);
+                document.getElementById('streak-message').textContent = '기록을 불러오는 데 실패했습니다.';
+            }
+        }
+
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/api/subjects');
+                const subjects = await response.json();
+                const select = document.getElementById('input-subject');
+
+                subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject;
+                    option.textContent = subject;
+                    select.appendChild(option);
+                });
+            } catch (err) {
+                console.error('Failed to load subjects:', err);
+            }
+        }
+
+        async function fetchOccupiedSlots(date) {
+            try {
+                const response = await fetch(`/api/sessions/${date}`);
+                const sessions = await response.json();
+
+                const container = document.getElementById('occupied-slots-container');
+                const list = document.getElementById('slot-list');
+                list.innerHTML = '';
+
+                if (sessions.length > 0) {
+                    container.style.display = 'block';
+                    sessions.forEach(s => {
+                        const start = s.start_time.split(' ')[1].substring(0, 5);
+                        const end = s.end_time.split(' ')[1].substring(0, 5);
+                        const item = document.createElement('div');
+                        item.className = 'slot-item';
+                        item.textContent = `${start} ~ ${end} (${s.subject})`;
+                        list.appendChild(item);
+                    });
+                } else {
+                    container.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Failed to fetch occupied slots:', err);
+            }
+        }
+
+        async function handleManualSubmit(e) {
+            e.preventDefault();
+
+            const date = document.getElementById('input-date').value;
+            const subject = document.getElementById('input-subject').value;
+            const startTimeStr = document.getElementById('input-start').value;
+            const endTimeStr = document.getElementById('input-end').value;
+
+            if (!startTimeStr || !endTimeStr) {
+                showNotification('시작 시간과 종료 시간을 입력해주세요.', 'error');
+                return;
+            }
+
+            // 날짜와 시간을 합쳐서 timestamp 생성
+            const start = new Date(`${date}T${startTimeStr}`).getTime() / 1000;
+            const end = new Date(`${date}T${endTimeStr}`).getTime() / 1000;
+            const duration = end - start;
+
+            if (duration <= 0) {
+                showNotification('종료 시간은 시작 시간보다 늦어야 합니다.', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/record-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject,
+                        start_time: start,
+                        end_time: end,
+                        duration
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('기록이 성공적으로 저장되었습니다!', 'success');
+                    // 폼 초기화 및 데이터 갱신
+                    e.target.reset();
+                    document.getElementById('input-date').value = date;
+                    fetchOccupiedSlots(date);
+                    loadStreakInfo();
+                } else {
+                    showNotification(result.error || result.message || '기록 저장 실패', 'error');
+                }
+            } catch (err) {
+                console.error('Failed to submit manual session:', err);
+                showNotification('서버 통신 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        function showNotification(message, type) {
+            const n = document.getElementById('notification');
+            n.textContent = message;
+            n.className = `notification ${type}`;
+            setTimeout(() => { n.className = 'notification'; }, 3000);
+        }
     </script>
 </body>
+
 </html>
