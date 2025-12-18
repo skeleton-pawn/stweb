@@ -948,14 +948,12 @@
         async function loadSubjects() {
             try {
                 const response = await fetch('/api/subjects');
-                subjects = await response.json();
+                subjects = await response.json(); // ["원가", ..., "운동", "craft"]
 
                 const selector = document.getElementById('subject-selector');
                 selector.innerHTML = '';
 
-                // "운동"은 하단 섹션에 있으므로 메인 리스트에서도 제외 (craft도 목록에서 제거됨)
-                // Note: app.py에서 craft가 제거되었으므로 API 리턴값에는 이미 craft가 없을 것임.
-                // 만약 포함되어 있다면 여기서 필터링 추가: s !== 'craft'
+                // 타이머 선택 목록에서는 운동과 craft를 제외 (하단 전용 섹션에서 입력하므로)
                 subjects.filter(s => s !== '운동' && s !== 'craft').forEach(subject => {
                     const btn = document.createElement('button');
                     btn.className = 'subject-btn';
@@ -964,6 +962,7 @@
                     selector.appendChild(btn);
                 });
             } catch (error) {
+                console.error('Failed to load subjects:', error);
                 showNotification('과목 로드 실패', 'error');
             }
         }
@@ -1375,7 +1374,9 @@
 
                 const backgroundColors = labels.map(subject => {
                     const subjectIndex = subjects.indexOf(subject);
-                    return globalColors[subjectIndex % globalColors.length];
+                    // 인덱스를 찾지 못했을 경우(-1)를 대비하여 절대값 처리 및 기본컬러 설정
+                    const colorIndex = subjectIndex >= 0 ? subjectIndex : labels.indexOf(subject);
+                    return globalColors[colorIndex % globalColors.length];
                 });
 
                 charts[chartId] = new Chart(canvas.getContext('2d'), {
