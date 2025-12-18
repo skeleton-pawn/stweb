@@ -1,0 +1,12 @@
+{
+  "name": "stweb",
+  "version": "1.0.0",
+  "description": "Study Timer Web App",
+  "scripts": {
+    "dev": "uv run --with-requirements requirements.txt app.py",
+    "start": "uv run --with-requirements requirements.txt app.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
