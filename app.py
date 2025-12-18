@@ -1,12 +1,38 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 import os
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
+# 세션 보안을 위한 시크릿 키 설정 (실제 운영 시에는 안전한 난수로 변경 필요)
+app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key_here')
 CORS(app)
+
+# --- Authentication Setup ---
+# 관리자 비밀번호 설정 (환경 변수에서 로드하거나 기본값 사용)
+# 실제로는 .env 파일에 ADMIN_PASSWORD=my_secure_password 형태로 설정하는 것이 좋습니다.
+# 여기서는 편의상 해시된 비밀번호를 하드코딩하지 않고, 환경변수 비교 시 해시를 생성하여 비교하거나 단순 비교할 수 있습니다.
+# 보안을 위해 환경변수의 평문 비밀번호와 입력받은 비밀번호를 비교합니다.
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '0000')
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == 'admin':
+        return User('admin')
+    return None
 
 # --- Database Setup ---
 # PostgreSQL 연결 설정
@@ -16,7 +42,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-SUBJECTS = ["원가", "세법", "재정", "행정", "세회", "재무", "독서", "운동"]
+SUBJECTS = ["원가", "세법", "재정", "행정", "세회", "재무", "독서"]
 
 # --- Database Model ---
 class StudySession(db.Model):
@@ -65,21 +91,44 @@ def get_motivation_message(today_hours, yesterday_hours):
 
 # --- Routes ---
 @app.route('/')
+@login_required
 def index():
     """메인 페이지를 렌더링합니다."""
     return render_template('index.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == ADMIN_PASSWORD:
+            user = User('admin')
+            login_user(user)
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            return render_template('login.html', error='비밀번호가 올바르지 않습니다.')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
 @app.route('/stopwatches')
+@login_required
 def multi_stopwatch_page():
     """멀티 스톱워치 페이지를 렌더링합니다."""
     return render_template('multi.html')
 
 @app.route('/api/subjects')
+@login_required
 def get_subjects():
     """과목 목록을 반환합니다."""
     return jsonify(SUBJECTS)
 
 @app.route('/api/record-session', methods=['POST'])
+@login_required
 def record_session():
     """공부 세션을 데이터베이스에 기록합니다."""
     data = request.json
@@ -108,6 +157,7 @@ def record_session():
         return jsonify({'error': 'Database record failed', 'details': str(e)}), 500
 
 @app.route('/api/today-stats')
+@login_required
 def get_today_stats():
     """오늘의 공부 통계를 반환합니다."""
     try:
@@ -151,6 +201,7 @@ def get_today_stats():
         return jsonify({'error': 'Failed to retrieve today stats', 'details': str(e)}), 500
 
 @app.route('/api/statistics/<int:days>')
+@login_required
 def get_statistics(days):
     """지정된 기간 동안의 통계를 반환합니다."""
     try:
@@ -192,6 +243,7 @@ def get_statistics(days):
         return jsonify({'error': 'Failed to retrieve statistics', 'details': str(e)}), 500
 
 @app.route('/api/subject-comparison')
+@login_required
 def get_subject_comparison():
     """기간별 과목 통계를 비교하여 반환합니다."""
     try:
@@ -230,11 +282,13 @@ def get_subject_comparison():
         return jsonify({'error': 'Failed to retrieve subject comparison', 'details': str(e)}), 500
 
 @app.route('/history')
+@login_required
 def history_page():
     """학습 기록 상세 페이지를 렌더링합니다."""
     return render_template('history.html')
 
 @app.route('/api/streak-info')
+@login_required
 def get_streak_info():
     """연속 학습일, 빠진 날, 응원 메시지를 반환합니다."""
     try:
