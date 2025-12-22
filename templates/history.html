@@ -304,8 +304,15 @@
             document.getElementById('input-start').value = "13:00";
             document.getElementById('input-end').value = "15:00";
 
-            // 오늘 날짜로 기본값 설정
-            document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+            // 오늘 날짜로 기본값 설정 (5AM 기준)
+            const now = new Date();
+            if (now.getHours() < 5) {
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                document.getElementById('input-date').value = yesterday.toISOString().split('T')[0];
+            } else {
+                document.getElementById('input-date').value = now.toISOString().split('T')[0];
+            }
             fetchOccupiedSlots(document.getElementById('input-date').value);
 
             // 날짜 변경 시 기입된 시간대 확인
@@ -440,12 +447,21 @@
                 return;
             }
 
+            // 5AM 이전 기록인 경우 '공부 날짜'를 전날로 조정 (시스템 일치성)
+            let studyDate = date;
+            const hour = parseInt(startTimeStr.split(':')[0]);
+            if (hour < 5) {
+                const d = new Date(date);
+                d.setDate(d.getDate() - 1);
+                studyDate = d.toISOString().split('T')[0];
+            }
+
             try {
                 const response = await fetch('/api/record-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        date,
+                        date: studyDate,
                         subject,
                         start_time: start,
                         end_time: end,
