@@ -141,7 +141,7 @@ def record_session():
         return jsonify({'message': 'Session too short, not recorded'}), 400
 
     new_session = StudySession(
-        Date=get_custom_date(),
+        Date=data.get('date', get_custom_date()),
         Subject=data['subject'],
         StartTime=datetime.fromtimestamp(data['start_time']).strftime('%Y-%m-%d %H:%M:%S'),
         EndTime=datetime.fromtimestamp(data['end_time']).strftime('%Y-%m-%d %H:%M:%S'),
@@ -372,6 +372,39 @@ def get_streak_info():
 
     except Exception as e:
         return jsonify({'error': 'Failed to retrieve streak info', 'details': str(e)}), 500
+
+@app.route('/api/delete-session/<int:session_id>', methods=['POST'])
+@login_required
+def delete_session(session_id):
+    """특정 학습 세션을 삭제합니다."""
+    try:
+        session = StudySession.query.get(session_id)
+        if not session:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        db.session.delete(session)
+        db.session.commit()
+        return jsonify({'message': 'Session deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete session', 'details': str(e)}), 500
+
+@app.route('/api/delete-latest-session', methods=['POST'])
+@login_required
+def delete_latest_session():
+    """가장 최근에 추가된 학습 세션 하나를 삭제합니다."""
+    try:
+        # ID가 클수록 최근 기록이라고 가정 (혹은 StartTime 기준)
+        latest_session = StudySession.query.order_by(StudySession.id.desc()).first()
+        if not latest_session:
+            return jsonify({'error': 'No sessions found'}), 404
+        
+        db.session.delete(latest_session)
+        db.session.commit()
+        return jsonify({'message': f'Latest session ({latest_session.Subject}) deleted'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to delete latest session', 'details': str(e)}), 500
 
 @app.route('/api/health')
 def health_check():

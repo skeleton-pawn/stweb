@@ -204,6 +204,24 @@
             display: block;
         }
 
+        .btn-delete {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 20px;
+            display: block;
+            width: fit-content;
+        }
+
+        .btn-delete:hover {
+            background: #d32f2f;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -228,6 +246,7 @@
         <!-- 탭 1: 학습 현황 -->
         <div id="streak-content" class="tab-content active">
             <div id="streak-message" class="loading">로딩 중...</div>
+
             <h2>공부하지 않은 날</h2>
             <ul id="missed-days-list">
                 <!-- 데이터가 여기에 동적으로 추가됩니다 -->
@@ -265,6 +284,8 @@
                     </div>
                 </div>
                 <button type="submit" class="btn-submit">기록 완료</button>
+                <button type="button" class="btn-delete" style="width: 100%; margin-top: 10px;"
+                    onclick="handleDeleteLatest()">↩️ 방금 입력한 기록 삭제</button>
             </form>
         </div>
 
@@ -279,6 +300,10 @@
             loadStreakInfo();
             loadSubjects();
 
+            // 13:00 ~ 15:00 기본값 설정
+            document.getElementById('input-start').value = "13:00";
+            document.getElementById('input-end').value = "15:00";
+
             // 오늘 날짜로 기본값 설정
             document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
             fetchOccupiedSlots(document.getElementById('input-date').value);
@@ -286,6 +311,18 @@
             // 날짜 변경 시 기입된 시간대 확인
             document.getElementById('input-date').addEventListener('change', (e) => {
                 fetchOccupiedSlots(e.target.value);
+            });
+
+            // 시작 시간 변경 시 종료 시간을 2시간 뒤로 자동 설정
+            document.getElementById('input-start').addEventListener('change', (e) => {
+                const startTime = e.target.value;
+                if (startTime) {
+                    const [hours, minutes] = startTime.split(':').map(Number);
+                    let endHours = hours + 2;
+                    if (endHours >= 24) endHours = 23; // 상한선
+                    const endStr = `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                    document.getElementById('input-end').value = endStr;
+                }
             });
 
             // 수동 입력 폼 제출
@@ -362,7 +399,14 @@
                         const end = s.end_time.split(' ')[1].substring(0, 5);
                         const item = document.createElement('div');
                         item.className = 'slot-item';
-                        item.textContent = `${start} ~ ${end} (${s.subject})`;
+                        item.style.display = 'flex';
+                        item.style.alignItems = 'center';
+                        item.style.gap = '10px';
+
+                        item.innerHTML = `
+                            <span>${start} ~ ${end} (${s.subject})</span>
+                            <button onclick="handleDeleteSession(${s.id})" style="border:none; background:none; color:#f44336; cursor:pointer; font-weight:bold; padding:0 5px;">✕</button>
+                        `;
                         list.appendChild(item);
                     });
                 } else {
@@ -401,6 +445,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        date,
                         subject,
                         start_time: start,
                         end_time: end,
@@ -415,6 +460,8 @@
                     // 폼 초기화 및 데이터 갱신
                     e.target.reset();
                     document.getElementById('input-date').value = date;
+                    document.getElementById('input-start').value = "13:00";
+                    document.getElementById('input-end').value = "15:00";
                     fetchOccupiedSlots(date);
                     loadStreakInfo();
                 } else {
@@ -423,6 +470,43 @@
             } catch (err) {
                 console.error('Failed to submit manual session:', err);
                 showNotification('서버 통신 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        async function handleDeleteSession(id) {
+            if (!confirm('이 기록을 삭제하시겠습니까?')) return;
+
+            try {
+                const response = await fetch(`/api/delete-session/${id}`, { method: 'POST' });
+                if (response.ok) {
+                    showNotification('기록이 삭제되었습니다.', 'success');
+                    fetchOccupiedSlots(document.getElementById('input-date').value);
+                    loadStreakInfo();
+                } else {
+                    showNotification('삭제 실패', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('서버 오류', 'error');
+            }
+        }
+
+        async function handleDeleteLatest() {
+            if (!confirm('가장 최근에 입력한 기록 하나를 삭제하시겠습니까?')) return;
+
+            try {
+                const response = await fetch('/api/delete-latest-session', { method: 'POST' });
+                const result = await response.json();
+                if (response.ok) {
+                    showNotification(result.message, 'success');
+                    fetchOccupiedSlots(document.getElementById('input-date').value);
+                    loadStreakInfo();
+                } else {
+                    showNotification(result.error || '삭제 실패', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showNotification('서버 오류', 'error');
             }
         }
 
